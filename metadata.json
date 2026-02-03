@@ -1,0 +1,7 @@
+{
+  "name": "CleanTrack OB DECK",
+  "description": "A comprehensive housekeeping public area reporting system with Daily, Weekly, and Monthly views, Excel export, and Gemini AI analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
