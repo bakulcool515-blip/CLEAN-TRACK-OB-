@@ -2,7 +2,7 @@ import { HousekeepingTask } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const formatDate = (dateString: string): string => {
+const formatDateLocal = (dateString: string): string => {
   const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
   return new Date(dateString).toLocaleDateString(undefined, options);
 };
@@ -14,19 +14,21 @@ export const exportToExcel = (tasks: HousekeepingTask[], filename: string) => {
   }
 
   // Create CSV Header
-  const headers = ['ID', 'Date', 'Category', 'Area', 'Job Description', 'Assignee', 'Status', 'Remarks', 'Has Photo'];
+  const headers = ['ID', 'Date', 'Category', 'Area', 'Job Description', 'Assignee', 'Status', 'Remarks', 'Photo Before (Base64)', 'Photo Progress (Base64)', 'Photo After (Base64)'];
   
   // Create CSV Rows
   const rows = tasks.map(task => [
     task.id,
     task.date,
     `"${task.category || ''}"`,
-    `"${task.area}"`, // Quote strings to handle commas
+    `"${task.area}"`, 
     `"${task.jobDescription}"`,
     `"${task.assignee}"`,
     task.status,
     `"${task.remarks}"`,
-    task.photo ? "Yes" : "No"
+    task.photoBefore ? `"${task.photoBefore}"` : '""',
+    task.photoProgress ? `"${task.photoProgress}"` : '""',
+    task.photoAfter ? `"${task.photoAfter}"` : '""'
   ]);
 
   const csvContent = [
@@ -34,7 +36,6 @@ export const exportToExcel = (tasks: HousekeepingTask[], filename: string) => {
     ...rows.map(row => row.join(','))
   ].join('\n');
 
-  // Add BOM for Excel compatibility with UTF-8
   const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
   
   const link = document.createElement("a");
@@ -53,55 +54,87 @@ export const exportToPdf = (tasks: HousekeepingTask[], title: string, filename: 
     return;
   }
 
-  const doc = new jsPDF();
+  const doc = new jsPDF('l', 'mm', 'a4');
 
-  // Add Title
-  doc.setFontSize(18);
-  doc.text(title, 14, 22);
+  doc.setFontSize(20);
+  doc.setTextColor(40);
+  doc.text(title, 14, 15);
   
-  // Add Timestamp
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setTextColor(100);
-  doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 28);
+  doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 20);
 
   // Define Columns
-  const tableColumn = ["Date", "Category", "Area", "Job Description", "Assignee", "Status", "Remarks"];
+  const tableColumn = ["Before", "Progress", "After", "Date", "Area", "Description", "Staff", "Status"];
   
   // Define Rows
   const tableRows = tasks.map(task => [
-    formatDate(task.date),
-    task.category || '-',
+    "", // photoBefore
+    "", // photoProgress
+    "", // photoAfter
+    formatDateLocal(task.date),
     task.area,
     task.jobDescription,
     task.assignee,
-    task.status,
-    task.remarks || '-'
+    task.status
   ]);
 
   // Generate Table
   autoTable(doc, {
     head: [tableColumn],
     body: tableRows,
-    startY: 35,
+    startY: 25,
     theme: 'grid',
     styles: { 
-      fontSize: 8, 
+      fontSize: 6, 
       cellPadding: 2,
-      overflow: 'linebreak'
+      valign: 'middle'
     },
     headStyles: { 
-      fillColor: [59, 130, 246], // Blue-500
+      fillColor: [30, 41, 59],
       textColor: 255,
       fontStyle: 'bold'
     },
     columnStyles: {
-      0: { cellWidth: 25 }, // Date
-      1: { cellWidth: 20 }, // Category
-      2: { cellWidth: 25 }, // Area
-      3: { cellWidth: 'auto' }, // Job Desc
-      4: { cellWidth: 20 }, // Assignee
-      5: { cellWidth: 20 }, // Status
-      6: { cellWidth: 30 }  // Remarks
+      0: { cellWidth: 22, minCellHeight: 18 }, // Before
+      1: { cellWidth: 22 }, // Progress
+      2: { cellWidth: 22 }, // After
+      3: { cellWidth: 18 },
+      4: { cellWidth: 25 },
+      5: { cellWidth: 'auto' },
+      6: { cellWidth: 20 },
+      7: { cellWidth: 18 }
+    },
+    didDrawCell: (data) => {
+      if (data.section === 'body') {
+        const task = tasks[data.row.index];
+        const padding = 1.2;
+        const imgWidth = data.cell.width - (padding * 2);
+        const imgHeight = data.cell.height - (padding * 2);
+
+        // Map column indices to photo keys
+        const photoMap: { [key: number]: keyof HousekeepingTask } = {
+          0: 'photoBefore',
+          1: 'photoProgress',
+          2: 'photoAfter'
+        };
+
+        if (photoMap[data.column.index]) {
+            const photoKey = photoMap[data.column.index];
+            const photoData = task[photoKey] as string;
+            
+            if (photoData) {
+              try {
+                doc.addImage(photoData, 'JPEG', data.cell.x + padding, data.cell.y + padding, imgWidth, imgHeight);
+              } catch (e) { doc.text("Err", data.cell.x + 2, data.cell.y + 8); }
+            } else {
+              doc.setFontSize(5);
+              doc.setTextColor(180);
+              const label = photoKey.replace('photo', '');
+              doc.text(`No ${label}`, data.cell.x + 4, data.cell.y + 8);
+            }
+        }
+      }
     }
   });
 

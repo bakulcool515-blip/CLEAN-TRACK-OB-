@@ -15,7 +15,8 @@
     "@google/genai": "^1.39.0",
     "react-markdown": "^10.1.0",
     "jspdf": "2.5.1",
-    "jspdf-autotable": "3.8.2"
+    "jspdf-autotable": "3.8.2",
+    "@supabase/supabase-js": "2.48.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

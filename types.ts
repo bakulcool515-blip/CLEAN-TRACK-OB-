@@ -29,7 +29,9 @@ export interface HousekeepingTask {
   assignee: string;
   status: TaskStatus;
   remarks: string;
-  photo?: string; // Base64 Data URL
+  photoBefore?: string;   // Base64 Data URL for Before work
+  photoProgress?: string; // Base64 Data URL for Progress work
+  photoAfter?: string;    // Base64 Data URL for After work
 }
 
 export type FilterPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all';

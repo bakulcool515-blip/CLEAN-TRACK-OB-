@@ -18,7 +18,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
     assignee: '',
     status: TaskStatus.PENDING,
     remarks: '',
-    photo: ''
+    photoBefore: '',
+    photoProgress: '',
+    photoAfter: ''
   });
 
   // Group areas for dropdown
@@ -34,6 +36,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
   // Camera State
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [activePhotoType, setActivePhotoType] = useState<'photoBefore' | 'photoProgress' | 'photoAfter' | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const stopCamera = () => {
@@ -42,14 +45,16 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
       setCameraStream(null);
     }
     setIsCameraOpen(false);
+    setActivePhotoType(null);
   };
 
-  const startCamera = async () => {
+  const startCamera = async (type: 'photoBefore' | 'photoProgress' | 'photoAfter') => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' } 
       });
       setCameraStream(stream);
+      setActivePhotoType(type);
       setIsCameraOpen(true);
     } catch (err) {
       console.error("Error accessing camera:", err);
@@ -58,7 +63,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
   };
 
   const capturePhoto = () => {
-    if (videoRef.current) {
+    if (videoRef.current && activePhotoType) {
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
@@ -66,14 +71,14 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setFormData(prev => ({ ...prev, photo: dataUrl }));
+        setFormData(prev => ({ ...prev, [activePhotoType]: dataUrl }));
         stopCamera();
       }
     }
   };
 
-  const removePhoto = () => {
-    setFormData(prev => ({ ...prev, photo: '' }));
+  const removePhoto = (type: 'photoBefore' | 'photoProgress' | 'photoAfter') => {
+    setFormData(prev => ({ ...prev, [type]: '' }));
   };
 
   const handleAreaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -89,7 +94,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.area && formData.jobDescription && formData.assignee) {
-      // Ensure category is set if missing (fallback)
       let finalCategory = formData.category;
       if (!finalCategory) {
           const areaItem = availableAreas.find(a => a.name === formData.area);
@@ -105,7 +109,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
         assignee: formData.assignee!,
         status: formData.status || TaskStatus.PENDING,
         remarks: formData.remarks || '',
-        photo: formData.photo
+        photoBefore: formData.photoBefore,
+        photoProgress: formData.photoProgress,
+        photoAfter: formData.photoAfter
       });
       onClose();
     }
@@ -123,7 +129,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
          assignee: '',
          status: TaskStatus.PENDING,
          remarks: '',
-         photo: ''
+         photoBefore: '',
+         photoProgress: '',
+         photoAfter: ''
       });
     }
     return () => {
@@ -143,6 +151,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
     return (
       <div className="fixed inset-0 bg-black z-[60] flex flex-col items-center justify-center">
         <div className="relative w-full h-full max-w-lg bg-black flex flex-col">
+          <div className="absolute top-4 left-0 right-0 text-center text-white z-10">
+            <span className="bg-black/50 px-3 py-1 rounded-full text-sm font-bold uppercase tracking-widest border border-white/20">
+              Capturing {activePhotoType?.replace('photo', '').toUpperCase()}
+            </span>
+          </div>
           <video 
             ref={videoRef} 
             autoPlay 
@@ -160,7 +173,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
             <button 
               type="button" 
               onClick={capturePhoto} 
-              className="w-16 h-16 rounded-full bg-white border-4 border-gray-300 shadow-lg active:scale-95 transition-transform"
+              className="w-20 h-20 rounded-full bg-white border-8 border-gray-600 shadow-lg active:scale-95 transition-transform"
             ></button>
             <div className="w-16"></div> 
           </div>
@@ -171,7 +184,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[95vh] overflow-y-auto">
         <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white z-10">
           <h2 className="text-xl font-semibold text-gray-800">
             {initialData ? 'Edit Task' : 'New Housekeeping Task'}
@@ -184,21 +197,35 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
         </div>
         
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <input 
-              type="date" 
-              required
-              className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={formData.date}
-              onChange={(e) => setFormData(prev => ({...prev, date: e.target.value}))}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+              <input 
+                type="date" 
+                required
+                className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                value={formData.date}
+                onChange={(e) => setFormData(prev => ({...prev, date: e.target.value}))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Status</label>
+              <select 
+                className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                value={formData.status}
+                onChange={(e) => setFormData(prev => ({...prev, status: e.target.value as TaskStatus}))}
+              >
+                {Object.values(TaskStatus).map(status => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Location / Area</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Location / Area</label>
             <select 
-              className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
               value={formData.area}
               onChange={handleAreaChange}
               required
@@ -214,97 +241,125 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, ini
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Mopping floor, Dusting furniture"
-              required
-              className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={formData.jobDescription}
-              onChange={(e) => setFormData(prev => ({...prev, jobDescription: e.target.value}))}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Job Description</label>
+              <input 
+                type="text" 
+                placeholder="e.g. Mopping floor"
+                required
+                className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                value={formData.jobDescription}
+                onChange={(e) => setFormData(prev => ({...prev, jobDescription: e.target.value}))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Assignee Staff</label>
+              <input 
+                type="text" 
+                placeholder="Staff Name"
+                required
+                className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                value={formData.assignee}
+                onChange={(e) => setFormData(prev => ({...prev, assignee: e.target.value}))}
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
-            <input 
-              type="text" 
-              placeholder="Staff Name"
-              required
-              className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={formData.assignee}
-              onChange={(e) => setFormData(prev => ({...prev, assignee: e.target.value}))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select 
-              className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={formData.status}
-              onChange={(e) => setFormData(prev => ({...prev, status: e.target.value as TaskStatus}))}
-            >
-              {Object.values(TaskStatus).map(status => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Evidence Photo</label>
-            {formData.photo ? (
-              <div className="relative mt-2">
-                <img src={formData.photo} alt="Task Evidence" className="w-full h-48 object-cover rounded-md border" />
+          <div className="grid grid-cols-3 gap-3">
+            {/* Before Photo */}
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">BEFORE</label>
+              {formData.photoBefore ? (
+                <div className="relative">
+                  <img src={formData.photoBefore} alt="Before" className="w-full h-24 object-cover rounded-md border" />
+                  <div className="absolute top-1 right-1 flex gap-1">
+                    <button type="button" onClick={() => startCamera('photoBefore')} className="bg-blue-600 text-white p-1 rounded-full shadow-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
+                    <button type="button" onClick={() => removePhoto('photoBefore')} className="bg-red-600 text-white p-1 rounded-full shadow-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                  </div>
+                </div>
+              ) : (
                 <button 
                   type="button" 
-                  onClick={removePhoto}
-                  className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full hover:bg-red-700 shadow-md"
-                  title="Remove photo"
+                  onClick={() => startCamera('photoBefore')}
+                  className="w-full border-2 border-dashed border-gray-300 rounded-md h-24 flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-blue-300 transition"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  <span className="text-[9px] font-bold">BEFORE</span>
                 </button>
-              </div>
-            ) : (
-              <button 
-                type="button" 
-                onClick={startCamera}
-                className="w-full border-2 border-dashed border-gray-300 rounded-md p-6 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-blue-400 transition"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span>Take Photo Evidence</span>
-              </button>
-            )}
+              )}
+            </div>
+
+            {/* Progress Photo */}
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">PROGRESS</label>
+              {formData.photoProgress ? (
+                <div className="relative">
+                  <img src={formData.photoProgress} alt="Progress" className="w-full h-24 object-cover rounded-md border border-blue-200" />
+                  <div className="absolute top-1 right-1 flex gap-1">
+                    <button type="button" onClick={() => startCamera('photoProgress')} className="bg-blue-600 text-white p-1 rounded-full shadow-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
+                    <button type="button" onClick={() => removePhoto('photoProgress')} className="bg-red-600 text-white p-1 rounded-full shadow-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  type="button" 
+                  onClick={() => startCamera('photoProgress')}
+                  className="w-full border-2 border-dashed border-blue-200 bg-blue-50/20 rounded-md h-24 flex flex-col items-center justify-center text-blue-400 hover:bg-blue-50 hover:border-blue-300 transition"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  <span className="text-[9px] font-bold">PROGRESS</span>
+                </button>
+              )}
+            </div>
+
+            {/* After Photo */}
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">AFTER</label>
+              {formData.photoAfter ? (
+                <div className="relative">
+                  <img src={formData.photoAfter} alt="After" className="w-full h-24 object-cover rounded-md border" />
+                  <div className="absolute top-1 right-1 flex gap-1">
+                    <button type="button" onClick={() => startCamera('photoAfter')} className="bg-blue-600 text-white p-1 rounded-full shadow-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
+                    <button type="button" onClick={() => removePhoto('photoAfter')} className="bg-red-600 text-white p-1 rounded-full shadow-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  type="button" 
+                  onClick={() => startCamera('photoAfter')}
+                  className="w-full border-2 border-dashed border-gray-300 rounded-md h-24 flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-blue-300 transition"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  <span className="text-[9px] font-bold">AFTER</span>
+                </button>
+              )}
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remarks</label>
             <textarea 
-              className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              rows={3}
+              className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+              rows={2}
               value={formData.remarks}
               onChange={(e) => setFormData(prev => ({...prev, remarks: e.target.value}))}
             />
           </div>
 
-          <div className="flex justify-end space-x-3 mt-6">
+          <div className="flex justify-end space-x-3 mt-4">
             <button 
               type="button" 
               onClick={onClose}
-              className="px-4 py-2 border rounded-md text-gray-600 hover:bg-gray-50"
+              className="px-4 py-2 border rounded-md text-gray-600 hover:bg-gray-50 text-sm"
             >
               Cancel
             </button>
             <button 
               type="submit" 
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm text-sm font-bold"
             >
-              Save Task
+              Save Report
             </button>
           </div>
         </form>
