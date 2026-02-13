@@ -9,13 +9,13 @@ interface StatsCardProps {
 
 export const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, colorClass }) => {
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
-      <div className={`p-4 rounded-full ${colorClass} text-white`}>
+    <div className="bg-white p-4 md:p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center space-x-4 transition-transform active:scale-95">
+      <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${colorClass} text-white text-xl md:text-2xl flex items-center justify-center shrink-0 shadow-lg`}>
         {icon}
       </div>
-      <div>
-        <p className="text-gray-500 text-sm font-medium">{title}</p>
-        <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
+      <div className="min-w-0">
+        <p className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-[0.15em] truncate mb-0.5">{title}</p>
+        <h3 className="text-xl md:text-2xl font-black text-slate-900 leading-none">{value}</h3>
       </div>
     </div>
   );
